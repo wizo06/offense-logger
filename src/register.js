@@ -9,13 +9,13 @@ const commands = [
     .setDescription("Log an offense that a user made")
     .addUserOption((option) =>
       option
-        .setName("user")
+        .setName("offender")
         .setDescription("The user that committed the offense")
         .setRequired(true)
     )
     .addStringOption((option) =>
       option
-        .setName("action")
+        .setName("punishment")
         .setDescription("The action that you took to punish the user")
         .setRequired(true)
     )
@@ -96,6 +96,16 @@ const commands = [
         .setName("screenshot")
         .setDescription("Optional screenshot that you would like to provide")
         .setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("user")
+    .setDescription("Looks up a user's offenses")
+    .addUserOption((option) =>
+      option
+        .setName("user")
+        .setDescription("The user in question")
+        .setRequired(true)
     ),
 ];
 
