@@ -1,7 +1,6 @@
 const { Client, Intents, MessageAttachment } = require("discord.js");
 const { token } = require("../config/config.json");
 const { db } = require("./firebase.js");
-const { table, getBorderCharacters } = require("table");
 
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 
@@ -84,7 +83,11 @@ client.on("interactionCreate", async (interaction) => {
               value: `<t:${Math.floor(offender.createdTimestamp / 1000)}>`,
               inline: true,
             },
-            { name: rule.isImmediatelyBannable ? "IMMEDIATELY BANNABLE" : "⠀", value: "⠀", inline: true },
+            {
+              name: rule.isImmediatelyBannable ? "IMMEDIATELY BANNABLE" : "⠀",
+              value: "⠀",
+              inline: true,
+            },
             {
               name: "Channel",
               value: `<#${channel.id}>`,
@@ -122,48 +125,112 @@ client.on("interactionCreate", async (interaction) => {
 
     const user = interaction.options.getUser("user");
 
-    const offensesSnapshot = await db
-      .collection("offenses")
-      .where("offenderId", "==", user.id)
+    if (interaction.options.getSubcommand(true) === "summary") {
+      const offensesSnapshot = await db
+        .collection("offenses")
+        .where("offenderId", "==", user.id)
+        .get();
+
+      const rulesSnapshot = await db
+        .collection("rules")
+        .orderBy("number", "asc")
+        .get();
+
+      const fields = [
+        { name: "User", value: `<@${user.id}>`, inline: true },
+        {
+          name: "User's account created at",
+          value: `<t:${Math.floor(user.createdTimestamp / 1000)}>`,
+          inline: true,
+        },
+      ];
+      for (const doc of rulesSnapshot.docs) {
+        const numOfStrikes = offensesSnapshot.docs.filter(
+          (x) => x.data().rule == doc.data().number
+        ).length;
+
+        fields.push({
+          name: `${doc.data().number}. ${doc.data().shortName}`,
+          value: `${numOfStrikes}`,
+        });
+      }
+
+      await interaction.editReply({
+        embeds: [
+          {
+            title: `SUMMARY OF OFFENSES`,
+            description: `Total offenses: ${offensesSnapshot.size}`,
+            color: 0x00ffff,
+            author: {
+              name: user.tag,
+              iconURL: user.avatarURL(),
+            },
+            fields: fields,
+          },
+        ],
+      });
+    }
+
+    if (interaction.options.getSubcommand(true) === "history") {
+      const offensesSnapshot = await db
+        .collection("offenses")
+        .where("offenderId", "==", user.id)
+        .get();
+
+      const rulesSnapshot = await db
+        .collection("rules")
+        .orderBy("number", "asc")
+        .get();
+
+      const fields = offensesSnapshot.docs
+        .sort((a, b) => b.data().timestamp - a.data().timestamp)
+        .slice(0, 25)
+        .map((x) => {
+          const rule = rulesSnapshot.docs.filter(
+            (y) => y.data().number === x.data().rule
+          )[0];
+          return {
+            name: `${rule.data().number}. ${rule.data().shortName}`,
+            value: `Timestamp: <t:${x.data().timestamp}> | Logged by: <@${
+              x.data().loggedBy
+            }>`,
+          };
+        });
+
+      await interaction.editReply({
+        embeds: [
+          {
+            author: {
+              name: user.tag,
+              iconURL: user.avatarURL(),
+            },
+            title: "HISTORY OF OFFENSES",
+            description: "25 most recent offenses",
+            color: 0x00ffff,
+            fields: fields,
+          },
+        ],
+      });
+    }
+  }
+
+  if (interaction.commandName === "rules") {
+    await interaction.deferReply();
+
+    const snapshot = await db
+      .collection("rules")
+      .orderBy("number", "asc")
       .get();
-
-    const rulesSnapshot = await db.collection("rules").orderBy("number", "asc").get();
-
-    const data = [];
-    for (const doc of rulesSnapshot.docs) {
-      const numOfStrikes = offensesSnapshot.docs.filter(x => x.data().rule == doc.data().number).length;
-      data.push([numOfStrikes, `${doc.data().number}. ${doc.data().description}`])
-    } 
-
-    const config = {
-      singleLine: true,
-      border: getBorderCharacters("norc"),
-    };
-    const formattedTable = table(data, config);
+    const fields = snapshot.docs.map((x) => ({
+      name: `${x.data().number}. ${x.data().shortName}`,
+      value: x.data().description,
+    }));
 
     await interaction.editReply({
       embeds: [
         {
-          title: `Total offenses: ${offensesSnapshot.size}`,
-          description: [
-            "Strikes | Rule",
-            `\`\`\``,
-            formattedTable,
-            `\`\`\``,
-          ].join("\n"),
-          color: 0x00ffff,
-          author: {
-            name: user.tag,
-            iconURL: user.avatarURL(),
-          },
-          fields: [
-            { name: "User", value: `<@${user.id}>`, inline: true },
-            {
-              name: "User's account created at",
-              value: `<t:${Math.floor(user.createdTimestamp / 1000)}>`,
-              inline: true,
-            },
-          ],
+          title: "RULES",
+          fields: fields,
         },
       ],
     });
