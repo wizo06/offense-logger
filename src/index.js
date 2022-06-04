@@ -14,10 +14,11 @@ client.on("interactionCreate", async (interaction) => {
     const offender = interaction.options.getUser("offender", true);
     const punishment = interaction.options.getString("punishment", true);
     const channel = interaction.options.getChannel("channel", true);
-    const rule = interaction.options.getInteger("rule", true);
+    const ruleNumber = interaction.options.getInteger("rule", true);
     const notes = interaction.options.getString("notes", false);
     const screenshot = interaction.options.getAttachment("screenshot", false);
 
+    // Write the offense to db
     await db
       .collection("offenses")
       .doc()
@@ -27,15 +28,16 @@ client.on("interactionCreate", async (interaction) => {
         channelId: channel.id,
         punishment: punishment,
         loggedBy: interaction.user.id,
-        rule: rule,
+        rule: ruleNumber,
         notes: notes,
         screenshotUrl: screenshot ? screenshot.url : null,
       });
 
+    // Read the offenses by offenderId to calculate the number of strikes
     const snapshot = await db
       .collection("offenses")
       .where("offenderId", "==", offender.id)
-      .where("rule", "==", rule)
+      .where("rule", "==", ruleNumber)
       .get();
 
     let strikeNumber = "";
@@ -44,15 +46,22 @@ client.on("interactionCreate", async (interaction) => {
     if (snapshot.size == 3) strikeNumber = "THREE STRIKES";
     if (snapshot.size >= 4) strikeNumber = "FOUR OR MORE STRIKES";
 
+    // Read the rules from db to see if the offense is immediately bannable
+    const rule = (
+      await db.collection("rules").where("number", "==", ruleNumber).get()
+    ).docs
+      .shift()
+      .data();
+
     await interaction.editReply({
-      files: [new MessageAttachment(`./assets/${rule}.png`)],
+      files: [new MessageAttachment(`./assets/${ruleNumber}.png`)],
       embeds: [
         {
           title: strikeNumber,
           description: notes,
           color: 0xff0000,
           thumbnail: {
-            url: `attachment://${rule}.png`,
+            url: `attachment://${ruleNumber}.png`,
           },
           image: {
             url: screenshot ? screenshot.url : null,
@@ -60,6 +69,9 @@ client.on("interactionCreate", async (interaction) => {
           author: {
             name: offender.tag,
             iconURL: offender.avatarURL(),
+          },
+          footer: {
+            text: rule.description,
           },
           fields: [
             {
@@ -72,7 +84,7 @@ client.on("interactionCreate", async (interaction) => {
               value: `<t:${Math.floor(offender.createdTimestamp / 1000)}>`,
               inline: true,
             },
-            { name: "-", value: "-" },
+            { name: rule.isImmediatelyBannable ? "IMMEDIATELY BANNABLE" : "⠀", value: "⠀", inline: true },
             {
               name: "Channel",
               value: `<#${channel.id}>`,
@@ -83,7 +95,7 @@ client.on("interactionCreate", async (interaction) => {
               value: punishment,
               inline: true,
             },
-            { name: "-", value: "-" },
+            { name: "⠀", value: "⠀", inline: true },
             {
               name: "Logged by",
               value: `<@${interaction.user.id}>`,
@@ -110,21 +122,19 @@ client.on("interactionCreate", async (interaction) => {
 
     const user = interaction.options.getUser("user");
 
-    const snapshot = await db
+    const offensesSnapshot = await db
       .collection("offenses")
       .where("offenderId", "==", user.id)
       .get();
 
+    const rulesSnapshot = await db.collection("rules").orderBy("number", "asc").get();
+
     const data = [];
-    for (let index = 1; index <= 25; index++) {
-      // todo: replace 25 with rules that are fetched from db
-      // todo: use uuid for rules' doc.id and store the number in the doc instead
-      // todo: add a isImmediatelyBannable bool
-      const strikes = snapshot.docs.filter(
-        (x) => x.data().rule == index
-      ).length;
-      data.push([strikes, index]);
-    }
+    for (const doc of rulesSnapshot.docs) {
+      const numOfStrikes = offensesSnapshot.docs.filter(x => x.data().rule == doc.data().number).length;
+      data.push([numOfStrikes, `${doc.data().number}. ${doc.data().description}`])
+    } 
+
     const config = {
       singleLine: true,
       border: getBorderCharacters("norc"),
@@ -134,22 +144,24 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.editReply({
       embeds: [
         {
-          title: `Total offenses: ${snapshot.size}`,
+          title: `Total offenses: ${offensesSnapshot.size}`,
           description: [
             "Strikes | Rule",
             `\`\`\``,
             formattedTable,
             `\`\`\``,
           ].join("\n"),
-          color: 0x0000ff,
-          thumbnail: {
-            url: user.avatarURL(),
+          color: 0x00ffff,
+          author: {
+            name: user.tag,
+            iconURL: user.avatarURL(),
           },
           fields: [
-            { name: "User", value: `<@${user.id}>` },
+            { name: "User", value: `<@${user.id}>`, inline: true },
             {
               name: "User's account created at",
               value: `<t:${Math.floor(user.createdTimestamp / 1000)}>`,
+              inline: true,
             },
           ],
         },
