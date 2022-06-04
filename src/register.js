@@ -93,10 +93,6 @@ const rest = new REST({ version: "9" }).setToken(token);
       new SlashCommandBuilder()
         .setName("rules")
         .setDescription("Show all rules"),
-
-      new SlashCommandBuilder()
-        .setName("history")
-        .setDescription("Show all rules"),
     ];
 
     console.log("Started refreshing application (/) commands.");
