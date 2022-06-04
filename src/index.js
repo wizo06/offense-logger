@@ -175,6 +175,8 @@ client.on("interactionCreate", async (interaction) => {
       const offensesSnapshot = await db
         .collection("offenses")
         .where("offenderId", "==", user.id)
+        .orderBy("timestamp", "desc")
+        .limit(25)
         .get();
 
       const rulesSnapshot = await db
@@ -183,8 +185,6 @@ client.on("interactionCreate", async (interaction) => {
         .get();
 
       const fields = offensesSnapshot.docs
-        .sort((a, b) => b.data().timestamp - a.data().timestamp)
-        .slice(0, 25)
         .map((x) => {
           const rule = rulesSnapshot.docs.filter(
             (y) => y.data().number === x.data().rule
