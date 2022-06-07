@@ -1,5 +1,6 @@
 const rules = require(process.cwd() + "/config/rules.json");
-const { APPLICATION_COMMAND_TYPES, APPLICATION_COMMAND_OPTION_TYPES } = require(process.cwd() + "/internal/enums/index.js");
+const { APPLICATION_COMMAND_TYPES, APPLICATION_COMMAND_OPTION_TYPES } = require(process.cwd() +
+  "/internal/enums/index.js");
 const { db } = require(process.cwd() + "/internal/db");
 
 const discordCommand = {
@@ -49,6 +50,12 @@ const discordCommand = {
           type: APPLICATION_COMMAND_OPTION_TYPES.ATTACHMENT,
           name: "screenshot",
           description: "Screenshot that you would like to provide",
+        },
+        {
+          type: APPLICATION_COMMAND_OPTION_TYPES.USER,
+          name: "mod",
+          description:
+            "The mod who is reporting this offense. It will default to the user who is executing the command if nothing is provided.",
         },
       ],
     },
@@ -124,6 +131,7 @@ const handleLogSubcommand = async (interaction) => {
   const ruleNumber = interaction.options.getInteger("rule", true);
   const notes = interaction.options.getString("notes");
   const screenshot = interaction.options.getAttachment("screenshot");
+  const mod = interaction.options.getUser("mod");
 
   // Write the offense to db
   await db
@@ -205,7 +213,7 @@ const handleLogSubcommand = async (interaction) => {
           },
           {
             name: "Logged by",
-            value: `<@${interaction.user.id}>`,
+            value: mod ? mod.id :`<@${interaction.user.id}>`,
             inline: true,
           },
           {
