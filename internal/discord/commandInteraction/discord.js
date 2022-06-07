@@ -1,37 +1,37 @@
 const rules = require(process.cwd() + "/config/rules.json");
-const { APPLICATION_COMMAND_TYPES, APPLICATION_COMMAND_OPTION_TYPES } = require(process.cwd() + "/internal/enums");
+const { APPLICATION_COMMAND_TYPES, APPLICATION_COMMAND_OPTION_TYPES } = require(process.cwd() + "/internal/enums/index.js");
 const { db } = require(process.cwd() + "/internal/db");
 
 const discordCommand = {
-  type: APPLICATION_COMMAND_TYPES.get("CHAT_INPUT"),
+  type: APPLICATION_COMMAND_TYPES.CHAT_INPUT,
   name: "discord",
   description: "Commands related to offenses that happend in discord",
   options: [
     {
-      type: APPLICATION_COMMAND_OPTION_TYPES.get("SUB_COMMAND"),
+      type: APPLICATION_COMMAND_OPTION_TYPES.SUB_COMMAND,
       name: "log",
       description: "Log an offense that a discord user committed",
       options: [
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("USER"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.USER,
           name: "offender",
           description: "The user that committed the offense",
           required: true,
         },
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("STRING"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.STRING,
           name: "punishment",
           description: "The action that you took to punish the user",
           required: true,
         },
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("CHANNEL"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.CHANNEL,
           name: "channel",
           description: "The channel where the offense took place",
           required: true,
         },
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("INTEGER"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.INTEGER,
           name: "rule",
           description: "The rule that was broken by the user",
           required: true,
@@ -41,34 +41,34 @@ const discordCommand = {
             .map((x) => ({ name: `${x.number}. ${x.shortName}`, value: x.number })),
         },
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("STRING"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.STRING,
           name: "notes",
           description: "Additional notes that you would like to provide",
         },
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("ATTACHMENT"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.ATTACHMENT,
           name: "screenshot",
           description: "Screenshot that you would like to provide",
         },
       ],
     },
     {
-      type: APPLICATION_COMMAND_OPTION_TYPES.get("SUB_COMMAND"),
+      type: APPLICATION_COMMAND_OPTION_TYPES.SUB_COMMAND,
       name: "rules",
       description: "See all discord rules",
     },
     {
-      type: APPLICATION_COMMAND_OPTION_TYPES.get("SUB_COMMAND_GROUP"),
+      type: APPLICATION_COMMAND_OPTION_TYPES.SUB_COMMAND_GROUP,
       name: "user",
       description: "See the offenses of a discord user",
       options: [
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("SUB_COMMAND"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.SUB_COMMAND,
           name: "summary",
           description: "See the summary of offenses of a discord user",
           options: [
             {
-              type: APPLICATION_COMMAND_OPTION_TYPES.get("USER"),
+              type: APPLICATION_COMMAND_OPTION_TYPES.USER,
               name: "user",
               description: "The user in question",
               required: true,
@@ -76,12 +76,12 @@ const discordCommand = {
           ],
         },
         {
-          type: APPLICATION_COMMAND_OPTION_TYPES.get("SUB_COMMAND"),
+          type: APPLICATION_COMMAND_OPTION_TYPES.SUB_COMMAND,
           name: "history",
           description: "See the history of offenses of a discord user",
           options: [
             {
-              type: APPLICATION_COMMAND_OPTION_TYPES.get("USER"),
+              type: APPLICATION_COMMAND_OPTION_TYPES.USER,
               name: "user",
               description: "The user in question",
               required: true,
