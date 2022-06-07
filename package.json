@@ -1,8 +1,7 @@
 {
   "scripts": {
     "start": "node cmd/main.js",
-    "register": "node cmd/registerCommandInteraction.js",
-    "rules": "node cmd/writeRulesToDB.js"
+    "register": "node cmd/registerCommandInteraction.js"
   },
   "dependencies": {
     "@discordjs/builders": "^0.13.0",
