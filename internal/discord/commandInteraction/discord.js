@@ -1,5 +1,6 @@
 const rules = require(process.cwd() + "/config/rules.json");
 const { APPLICATION_COMMAND_TYPES, APPLICATION_COMMAND_OPTION_TYPES } = require(process.cwd() + "/internal/enums");
+const { db } = require(process.cwd() + "/internal/db");
 
 const discordCommand = {
   type: APPLICATION_COMMAND_TYPES.get("CHAT_INPUT"),
@@ -13,7 +14,7 @@ const discordCommand = {
       options: [
         {
           type: APPLICATION_COMMAND_OPTION_TYPES.get("USER"),
-          name: "user",
+          name: "offender",
           description: "The user that committed the offense",
           required: true,
         },
@@ -71,8 +72,8 @@ const discordCommand = {
               name: "user",
               description: "The user in question",
               required: true,
-            }
-          ]
+            },
+          ],
         },
         {
           type: APPLICATION_COMMAND_OPTION_TYPES.get("SUB_COMMAND"),
@@ -84,8 +85,8 @@ const discordCommand = {
               name: "user",
               description: "The user in question",
               required: true,
-            }
-          ]
+            },
+          ],
         },
       ],
     },
@@ -94,29 +95,223 @@ const discordCommand = {
 
 const handleDiscordCommandInteraction = async (interaction) => {
   if (interaction.options.getSubcommand() === "log") {
+    handleLogSubcommand(interaction);
     return;
   }
 
   if (interaction.options.getSubcommand() === "rules") {
+    handleRulesSubcommand(interaction);
     return;
   }
 
   if (interaction.options.getSubcommandGroup() === "user" && interaction.options.getSubcommand() === "summary") {
+    handleUserSummarySubcommand(interaction);
     return;
   }
 
   if (interaction.options.getSubcommandGroup() === "user" && interaction.options.getSubcommand() === "history") {
+    handleUserHistorySubcommand(interaction);
     return;
   }
 };
 
-const handleLogSubcommand = async (interaction) => {};
+const handleLogSubcommand = async (interaction) => {
+  await interaction.deferReply();
 
-const handleRulesSubcommand = async (interaction) => {};
+  const offender = interaction.options.getUser("offender", true);
+  const punishment = interaction.options.getString("punishment", true);
+  const channel = interaction.options.getChannel("channel", true);
+  const ruleNumber = interaction.options.getInteger("rule", true);
+  const notes = interaction.options.getString("notes");
+  const screenshot = interaction.options.getAttachment("screenshot");
 
-const handleUserSummary = async (interaction) => {};
+  // Write the offense to db
+  await db
+    .collection("offenses")
+    .doc()
+    .set({
+      timestamp: Math.floor(interaction.createdTimestamp / 1000),
+      offenderId: offender.id,
+      channelId: channel.id,
+      punishment: punishment,
+      loggedBy: interaction.user.id,
+      rule: ruleNumber,
+      notes: notes,
+      screenshotUrl: screenshot ? screenshot.url : null,
+      platform: "DISCORD",
+    });
 
-const handleUserHistory = async (interaction) => {};
+  // Read the offenses by offenderId to calculate the number of strikes
+  const snapshot = await db
+    .collection("offenses")
+    .where("offenderId", "==", offender.id)
+    .where("platform", "==", "DISCORD")
+    .where("rule", "==", ruleNumber)
+    .get();
+
+  let strikeNumber = "";
+  if (snapshot.size == 1) strikeNumber = "ONE STRIKE";
+  if (snapshot.size == 2) strikeNumber = "TWO STRIKES";
+  if (snapshot.size == 3) strikeNumber = "THREE STRIKES";
+  if (snapshot.size >= 4) strikeNumber = "FOUR OR MORE STRIKES";
+
+  await interaction.editReply({
+    files: [{ attachment: `./assets/${ruleNumber}.png` }],
+    embeds: [
+      {
+        title: strikeNumber,
+        description: notes,
+        color: 0xff0000,
+        thumbnail: {
+          url: `attachment://${ruleNumber}.png`,
+        },
+        image: {
+          url: screenshot ? screenshot.url : null,
+        },
+        author: {
+          name: offender.tag,
+          iconURL: offender.avatarURL(),
+        },
+        fields: [
+          {
+            name: "Offender",
+            value: `<@${offender.id}>`,
+            inline: true,
+          },
+          {
+            name: "Offender's account created at",
+            value: `<t:${Math.floor(offender.createdTimestamp / 1000)}>`,
+            inline: true,
+          },
+          {
+            name: "⠀",
+            value: "⠀",
+            inline: true,
+          },
+          {
+            name: "Channel",
+            value: `<#${channel.id}>`,
+            inline: true,
+          },
+          {
+            name: "Punishment",
+            value: punishment,
+            inline: true,
+          },
+          {
+            name: "⠀",
+            value: "⠀",
+            inline: true,
+          },
+          {
+            name: "Logged by",
+            value: `<@${interaction.user.id}>`,
+            inline: true,
+          },
+          {
+            name: "Timestamp",
+            value: `<t:${Math.floor(interaction.createdTimestamp / 1000)}>`,
+            inline: true,
+          },
+          {
+            name: "Relative Timestamp",
+            value: `<t:${Math.floor(interaction.createdTimestamp / 1000)}:R>`,
+            inline: true,
+          },
+        ],
+      },
+    ],
+  });
+};
+
+const handleRulesSubcommand = async (interaction) => {
+  await interaction.deferReply();
+
+  await interaction.editReply({
+    embeds: [
+      {
+        title: "RULES",
+        fields: rules
+          .filter((x) => x.platform === "DISCORD")
+          .sort((a, b) => a.number - b.number)
+          .map((x) => ({ name: `${x.number}. ${x.shortName}`, value: x.description })),
+      },
+    ],
+  });
+};
+
+const handleUserSummarySubcommand = async (interaction) => {
+  await interaction.deferReply();
+  const user = interaction.options.getUser("user");
+
+  const offensesSnapshot = await db
+    .collection("offenses")
+    .where("offenderId", "==", user.id)
+    .where("platform", "==", "DISCORD")
+    .get();
+
+  const fields = [];
+  for (const rule of rules.filter((x) => x.platform === "DISCORD").sort((a, b) => a.number - b.number)) {
+    const numOfStrikes = offensesSnapshot.docs.filter((offense) => offense.data().rule == rule.number).length;
+
+    fields.push({
+      name: `${rule.number}. ${rule.shortName}`,
+      value: `${numOfStrikes}`,
+    });
+  }
+
+  await interaction.editReply({
+    embeds: [
+      {
+        title: `SUMMARY OF OFFENSES`,
+        description: `<@${user.id}> Account Created <t:${Math.floor(user.createdTimestamp / 1000)}>\nTotal offenses: ${
+          offensesSnapshot.size
+        }`,
+        color: 0x00ffff,
+        author: {
+          name: user.tag,
+          iconURL: user.avatarURL(),
+        },
+        fields: fields,
+      },
+    ],
+  });
+};
+
+const handleUserHistorySubcommand = async (interaction) => {
+  await interaction.deferReply();
+  const user = interaction.options.getUser("user");
+
+  const offensesSnapshot = await db
+    .collection("offenses")
+    .where("offenderId", "==", user.id)
+    .orderBy("timestamp", "desc")
+    .limit(25)
+    .get();
+
+  const fields = offensesSnapshot.docs.map((offense) => {
+    const rule = rules.filter((rule) => rule.number === offense.data().rule)[0];
+    return {
+      name: `${rule.number}. ${rule.shortName}`,
+      value: `Timestamp: <t:${offense.data().timestamp}> | Logged by: <@${offense.data().loggedBy}>`,
+    };
+  });
+
+  await interaction.editReply({
+    embeds: [
+      {
+        author: {
+          name: user.tag,
+          iconURL: user.avatarURL(),
+        },
+        title: "HISTORY OF OFFENSES",
+        description: "25 most recent offenses",
+        color: 0x00ffff,
+        fields: fields,
+      },
+    ],
+  });
+};
 
 module.exports = {
   discordCommand,
