@@ -190,7 +190,7 @@ const handleLogSubcommand = async (interaction) => {
           {
             title: strikeNumber,
             description: notes,
-            color: 0xff0000,
+            color: 0x9146ff,
             thumbnail: {
               url: `attachment://${ruleNumber}.png`,
             },
@@ -202,7 +202,7 @@ const handleLogSubcommand = async (interaction) => {
               iconURL: user.profilePictureUrl,
             },
             footer: {
-              text: rules.filter(x => x.platform === "TWITCH" && x.number === ruleNumber)[0].description,
+              text: rules.filter((x) => x.platform === "TWITCH" && x.number === ruleNumber)[0].description,
             },
             fields: [
               {
@@ -289,6 +289,7 @@ const handleRulesSubcommand = async (interaction) => {
         embeds: [
           {
             title: "RULES",
+            color: 0x9146ff,
             fields: rules
               .filter((x) => x.platform === "TWITCH")
               .sort((a, b) => a.number - b.number)
@@ -368,7 +369,7 @@ const handleUserSummarySubcommand = async (interaction) => {
             description: `**${user.name}** Account Created <t:${Math.floor(
               user.creationDate.getTime() / 1000
             )}>\nTotal offenses: ${offensesSnapshot.size}`,
-            color: 0x00ffff,
+            color: 0x9146ff,
             author: {
               name: user.name,
               iconURL: user.profilePictureUrl,
@@ -453,7 +454,7 @@ const handleUserHistorySubcommand = async (interaction) => {
             },
             title: "HISTORY OF OFFENSES",
             description: "25 most recent offenses",
-            color: 0x00ffff,
+            color: 0x9146ff,
             fields: fields,
           },
         ],
