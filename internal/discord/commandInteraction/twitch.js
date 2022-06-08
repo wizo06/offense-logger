@@ -234,7 +234,7 @@ const handleLogSubcommand = async (interaction) => {
               },
               {
                 name: "Logged by",
-                value: mod ? mod.id : `<@${interaction.user.id}>`,
+                value: mod ? `<@${mod.id}>` : `<@${interaction.user.id}>`,
                 inline: true,
               },
               {
