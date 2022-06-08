@@ -50,8 +50,7 @@ const twitchCommand = {
         {
           type: APPLICATION_COMMAND_OPTION_TYPES.USER,
           name: "mod",
-          description:
-            "The mod who is reporting this offense. It will default to the user who is executing the command if nothing is provided.",
+          description: "The mod who is reporting this offense. Leave empty unless reporting on behalf of another mod",
         },
       ],
     },
@@ -124,6 +123,8 @@ const handleTwitchCommandInteraction = async (interaction) => {
 
 const handleLogSubcommand = async (interaction) => {
   try {
+    logger.info(`${interaction.user.tag}: /${interaction.commandName} ${interaction.options.getSubcommand()}`);
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
@@ -267,11 +268,14 @@ const handleLogSubcommand = async (interaction) => {
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
 const handleRulesSubcommand = async (interaction) => {
   try {
+    logger.info(`${interaction.user.tag}: /${interaction.commandName} ${interaction.options.getSubcommand()}`);
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
@@ -306,16 +310,23 @@ const handleRulesSubcommand = async (interaction) => {
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
 const handleUserSummarySubcommand = async (interaction) => {
   try {
+    logger.info(
+      `${interaction.user.tag}: /${
+        interaction.commandName
+      } ${interaction.options.getSubcommandGroup()} ${interaction.options.getSubcommand()}`
+    );
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
     });
-    const offender = interaction.options.getUser("user");
+    const offender = interaction.options.getString("user");
 
     const user = await apiClient.users.getUserByName(offender).catch((e) => {
       logger.error(e);
@@ -380,16 +391,23 @@ const handleUserSummarySubcommand = async (interaction) => {
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
 const handleUserHistorySubcommand = async (interaction) => {
   try {
+    logger.info(
+      `${interaction.user.tag}: /${
+        interaction.commandName
+      } ${interaction.options.getSubcommandGroup()} ${interaction.options.getSubcommand()}`
+    );
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
     });
-    const offender = interaction.options.getUser("user");
+    const offender = interaction.options.getString("user");
 
     const user = await apiClient.users.getUserByName(offender).catch((e) => {
       logger.error(e);
@@ -413,7 +431,9 @@ const handleUserHistorySubcommand = async (interaction) => {
       });
 
     const fields = offensesSnapshot.docs.map((offense) => {
-      const rule = rules.filter((rule) => rule.number === offense.data().rule)[0];
+      const rule = rules
+        .filter((x) => x.platform === "TWITCH")
+        .filter((rule) => rule.number === offense.data().rule)[0];
       return {
         name: `${rule.number}. ${rule.shortName}`,
         value: `Timestamp: <t:${offense.data().timestamp}> | Logged by: <@${offense.data().loggedBy}>`,

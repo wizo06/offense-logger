@@ -55,8 +55,7 @@ const discordCommand = {
         {
           type: APPLICATION_COMMAND_OPTION_TYPES.USER,
           name: "mod",
-          description:
-            "The mod who is reporting this offense. It will default to the user who is executing the command if nothing is provided.",
+          description: "The mod who is reporting this offense. Leave empty unless reporting on behalf of another mod",
         },
       ],
     },
@@ -129,6 +128,8 @@ const handleDiscordCommandInteraction = async (interaction) => {
 
 const handleLogSubcommand = async (interaction) => {
   try {
+    logger.info(`${interaction.user.tag}: /${interaction.commandName} ${interaction.options.getSubcommand()}`);
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
@@ -258,15 +259,17 @@ const handleLogSubcommand = async (interaction) => {
       await interaction.editReply({ content: e });
       return;
     }
-
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
 const handleRulesSubcommand = async (interaction) => {
   try {
+    logger.info(`${interaction.user.tag}: /${interaction.commandName} ${interaction.options.getSubcommand()}`);
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
@@ -294,15 +297,21 @@ const handleRulesSubcommand = async (interaction) => {
       await interaction.editReply({ content: e });
       return;
     }
-
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
 const handleUserSummarySubcommand = async (interaction) => {
   try {
+    logger.info(
+      `${interaction.user.tag}: /${
+        interaction.commandName
+      } ${interaction.options.getSubcommandGroup()} ${interaction.options.getSubcommand()}`
+    );
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
@@ -356,15 +365,21 @@ const handleUserSummarySubcommand = async (interaction) => {
       await interaction.editReply({ content: e });
       return;
     }
-
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
 const handleUserHistorySubcommand = async (interaction) => {
   try {
+    logger.info(
+      `${interaction.user.tag}: /${
+        interaction.commandName
+      } ${interaction.options.getSubcommandGroup()} ${interaction.options.getSubcommand()}`
+    );
+
     await interaction.deferReply().catch((e) => {
       logger.error(e);
       throw "DISCORD_ERROR";
@@ -384,7 +399,9 @@ const handleUserHistorySubcommand = async (interaction) => {
       });
 
     const fields = offensesSnapshot.docs.map((offense) => {
-      const rule = rules.filter((rule) => rule.number === offense.data().rule)[0];
+      const rule = rules
+        .filter((x) => x.platform === "DISCORD")
+        .filter((rule) => rule.number === offense.data().rule)[0];
       return {
         name: `${rule.number}. ${rule.shortName}`,
         value: `Timestamp: <t:${offense.data().timestamp}> | Logged by: <@${offense.data().loggedBy}>`,
@@ -416,10 +433,10 @@ const handleUserHistorySubcommand = async (interaction) => {
       await interaction.editReply({ content: e });
       return;
     }
-
     if (e === "DISCORD_ERROR") {
       return;
     }
+    await interaction.editReply({ content: "INTERNAL_ERROR" });
   }
 };
 
