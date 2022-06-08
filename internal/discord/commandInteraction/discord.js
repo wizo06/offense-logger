@@ -129,7 +129,10 @@ const handleDiscordCommandInteraction = async (interaction) => {
 
 const handleLogSubcommand = async (interaction) => {
   try {
-    await interaction.deferReply();
+    await interaction.deferReply().catch((e) => {
+      logger.error(e);
+      throw "DISCORD_ERROR";
+    });
 
     const offender = interaction.options.getUser("offender", true);
     const punishment = interaction.options.getString("punishment", true);
@@ -153,6 +156,10 @@ const handleLogSubcommand = async (interaction) => {
         notes: notes,
         screenshotUrl: screenshot ? screenshot.url : null,
         platform: "DISCORD",
+      })
+      .catch((e) => {
+        logger.error(e);
+        throw "DB_ERROR";
       });
 
     // Read the offenses by offenderId to calculate the number of strikes
@@ -161,7 +168,11 @@ const handleLogSubcommand = async (interaction) => {
       .where("offenderId", "==", offender.id)
       .where("platform", "==", "DISCORD")
       .where("rule", "==", ruleNumber)
-      .get();
+      .get()
+      .catch((e) => {
+        logger.error(e);
+        throw "DB_ERROR";
+      });
 
     let strikeNumber = "";
     if (snapshot.size == 1) strikeNumber = "ONE STRIKE";
@@ -169,108 +180,144 @@ const handleLogSubcommand = async (interaction) => {
     if (snapshot.size == 3) strikeNumber = "THREE STRIKES";
     if (snapshot.size >= 4) strikeNumber = "FOUR OR MORE STRIKES";
 
-    await interaction.editReply({
-      files: [{ attachment: `./assets/${ruleNumber}.png` }],
-      embeds: [
-        {
-          title: strikeNumber,
-          description: notes,
-          color: 0xff0000,
-          thumbnail: {
-            url: `attachment://${ruleNumber}.png`,
+    await interaction
+      .editReply({
+        files: [{ attachment: `./assets/${ruleNumber}.png` }],
+        embeds: [
+          {
+            title: strikeNumber,
+            description: notes,
+            color: 0xff0000,
+            thumbnail: {
+              url: `attachment://${ruleNumber}.png`,
+            },
+            image: {
+              url: screenshot ? screenshot.url : null,
+            },
+            author: {
+              name: offender.tag,
+              iconURL: offender.avatarURL(),
+            },
+            fields: [
+              {
+                name: "Offender",
+                value: `<@${offender.id}>`,
+                inline: true,
+              },
+              {
+                name: "Offender's account created at",
+                value: `<t:${Math.floor(offender.createdTimestamp / 1000)}>`,
+                inline: true,
+              },
+              {
+                name: "⠀",
+                value: "⠀",
+                inline: true,
+              },
+              {
+                name: "Channel",
+                value: `<#${channel.id}>`,
+                inline: true,
+              },
+              {
+                name: "Punishment",
+                value: punishment,
+                inline: true,
+              },
+              {
+                name: "⠀",
+                value: "⠀",
+                inline: true,
+              },
+              {
+                name: "Logged by",
+                value: mod ? mod.id : `<@${interaction.user.id}>`,
+                inline: true,
+              },
+              {
+                name: "Timestamp",
+                value: `<t:${Math.floor(interaction.createdTimestamp / 1000)}>`,
+                inline: true,
+              },
+              {
+                name: "Relative Timestamp",
+                value: `<t:${Math.floor(interaction.createdTimestamp / 1000)}:R>`,
+                inline: true,
+              },
+            ],
           },
-          image: {
-            url: screenshot ? screenshot.url : null,
-          },
-          author: {
-            name: offender.tag,
-            iconURL: offender.avatarURL(),
-          },
-          fields: [
-            {
-              name: "Offender",
-              value: `<@${offender.id}>`,
-              inline: true,
-            },
-            {
-              name: "Offender's account created at",
-              value: `<t:${Math.floor(offender.createdTimestamp / 1000)}>`,
-              inline: true,
-            },
-            {
-              name: "⠀",
-              value: "⠀",
-              inline: true,
-            },
-            {
-              name: "Channel",
-              value: `<#${channel.id}>`,
-              inline: true,
-            },
-            {
-              name: "Punishment",
-              value: punishment,
-              inline: true,
-            },
-            {
-              name: "⠀",
-              value: "⠀",
-              inline: true,
-            },
-            {
-              name: "Logged by",
-              value: mod ? mod.id : `<@${interaction.user.id}>`,
-              inline: true,
-            },
-            {
-              name: "Timestamp",
-              value: `<t:${Math.floor(interaction.createdTimestamp / 1000)}>`,
-              inline: true,
-            },
-            {
-              name: "Relative Timestamp",
-              value: `<t:${Math.floor(interaction.createdTimestamp / 1000)}:R>`,
-              inline: true,
-            },
-          ],
-        },
-      ],
-    });
+        ],
+      })
+      .catch((e) => {
+        logger.error(e);
+        throw "DISCORD_ERROR";
+      });
   } catch (e) {
     logger.error(e);
+    if (e === "DB_ERROR") {
+      await interaction.editReply({ content: e });
+      return;
+    }
+
+    if (e === "DISCORD_ERROR") {
+      return;
+    }
   }
 };
 
 const handleRulesSubcommand = async (interaction) => {
   try {
-    await interaction.deferReply();
-
-    await interaction.editReply({
-      embeds: [
-        {
-          title: "RULES",
-          fields: rules
-            .filter((x) => x.platform === "DISCORD")
-            .sort((a, b) => a.number - b.number)
-            .map((x) => ({ name: `${x.number}. ${x.shortName}`, value: x.description })),
-        },
-      ],
+    await interaction.deferReply().catch((e) => {
+      logger.error(e);
+      throw "DISCORD_ERROR";
     });
+
+    await interaction
+      .editReply({
+        embeds: [
+          {
+            title: "RULES",
+            fields: rules
+              .filter((x) => x.platform === "DISCORD")
+              .sort((a, b) => a.number - b.number)
+              .map((x) => ({ name: `${x.number}. ${x.shortName}`, value: x.description })),
+          },
+        ],
+      })
+      .catch((e) => {
+        logger.error(e);
+        throw "DISCORD_ERROR";
+      });
   } catch (e) {
     logger.error(e);
+    if (e === "DB_ERROR") {
+      await interaction.editReply({ content: e });
+      return;
+    }
+
+    if (e === "DISCORD_ERROR") {
+      return;
+    }
   }
 };
 
 const handleUserSummarySubcommand = async (interaction) => {
   try {
-    await interaction.deferReply();
+    await interaction.deferReply().catch((e) => {
+      logger.error(e);
+      throw "DISCORD_ERROR";
+    });
     const user = interaction.options.getUser("user");
 
     const offensesSnapshot = await db
       .collection("offenses")
       .where("offenderId", "==", user.id)
       .where("platform", "==", "DISCORD")
-      .get();
+      .get()
+      .catch((e) => {
+        logger.error(e);
+        throw "DB_ERROR";
+      });
 
     const fields = [];
     for (const rule of rules.filter((x) => x.platform === "DISCORD").sort((a, b) => a.number - b.number)) {
@@ -282,30 +329,46 @@ const handleUserSummarySubcommand = async (interaction) => {
       });
     }
 
-    await interaction.editReply({
-      embeds: [
-        {
-          title: `SUMMARY OF OFFENSES`,
-          description: `<@${user.id}> Account Created <t:${Math.floor(
-            user.createdTimestamp / 1000
-          )}>\nTotal offenses: ${offensesSnapshot.size}`,
-          color: 0x00ffff,
-          author: {
-            name: user.tag,
-            iconURL: user.avatarURL(),
+    await interaction
+      .editReply({
+        embeds: [
+          {
+            title: `SUMMARY OF OFFENSES`,
+            description: `<@${user.id}> Account Created <t:${Math.floor(
+              user.createdTimestamp / 1000
+            )}>\nTotal offenses: ${offensesSnapshot.size}`,
+            color: 0x00ffff,
+            author: {
+              name: user.tag,
+              iconURL: user.avatarURL(),
+            },
+            fields: fields,
           },
-          fields: fields,
-        },
-      ],
-    });
+        ],
+      })
+      .catch((e) => {
+        logger.error(e);
+        throw "DISCORD_ERROR";
+      });
   } catch (e) {
     logger.error(e);
+    if (e === "DB_ERROR") {
+      await interaction.editReply({ content: e });
+      return;
+    }
+
+    if (e === "DISCORD_ERROR") {
+      return;
+    }
   }
 };
 
 const handleUserHistorySubcommand = async (interaction) => {
   try {
-    await interaction.deferReply();
+    await interaction.deferReply().catch((e) => {
+      logger.error(e);
+      throw "DISCORD_ERROR";
+    });
     const user = interaction.options.getUser("user");
 
     const offensesSnapshot = await db
@@ -314,7 +377,11 @@ const handleUserHistorySubcommand = async (interaction) => {
       .where("platform", "==", "DISCORD")
       .orderBy("timestamp", "desc")
       .limit(25)
-      .get();
+      .get()
+      .catch((e) => {
+        logger.error(e);
+        throw "DB_ERROR";
+      });
 
     const fields = offensesSnapshot.docs.map((offense) => {
       const rule = rules.filter((rule) => rule.number === offense.data().rule)[0];
@@ -324,22 +391,35 @@ const handleUserHistorySubcommand = async (interaction) => {
       };
     });
 
-    await interaction.editReply({
-      embeds: [
-        {
-          author: {
-            name: user.tag,
-            iconURL: user.avatarURL(),
+    await interaction
+      .editReply({
+        embeds: [
+          {
+            author: {
+              name: user.tag,
+              iconURL: user.avatarURL(),
+            },
+            title: "HISTORY OF OFFENSES",
+            description: "25 most recent offenses",
+            color: 0x00ffff,
+            fields: fields,
           },
-          title: "HISTORY OF OFFENSES",
-          description: "25 most recent offenses",
-          color: 0x00ffff,
-          fields: fields,
-        },
-      ],
-    });
+        ],
+      })
+      .catch((e) => {
+        logger.error(e);
+        throw "DISCORD_ERROR";
+      });
   } catch (e) {
     logger.error(e);
+    if (e === "DB_ERROR") {
+      await interaction.editReply({ content: e });
+      return;
+    }
+
+    if (e === "DISCORD_ERROR") {
+      return;
+    }
   }
 };
 
