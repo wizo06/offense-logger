@@ -199,6 +199,9 @@ const handleLogSubcommand = async (interaction) => {
               name: offender.tag,
               iconURL: offender.avatarURL(),
             },
+            footer: {
+              text: rules.filter(x => x.platform === "DISCORD" && x.number === ruleNumber)[0].description,
+            },
             fields: [
               {
                 name: "Offender",
