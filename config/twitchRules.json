@@ -1,0 +1,56 @@
+[
+  {
+    "shortName": "ONLY ENGLISH OR KOREAN",
+    "description": "ONLY ENGLISH OR KOREAN",
+    "number": 1,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO DOXXING",
+    "description": "No doxxing allowed even if you know my irl name. (Please call me Yui here)",
+    "number": 2,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO MENTION OF OTHER STREAMERS",
+    "description": "Don't mention other streamers unless I do first.",
+    "number": 3,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO MENTION OF VIEWER COUNT",
+    "description": "Please don't mention viewer count.",
+    "number": 4,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO SELF PROMOTION",
+    "description": "No self promotion.",
+    "number": 5,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO SPOILERS",
+    "description": "NO SPOILERS when we're talking about animes/movies/shows/dramas and during watch parties.",
+    "number": 6,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO SPAMMING",
+    "description": "I'm bad at reading chat so you can spam until I read what you say but don't spam excessively.",
+    "number": 7,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO POLITICS, RELIGION, HATE SPEECH",
+    "description": "No politics, religion, homophobia, transphobia, racial slurs, etc.",
+    "number": 8,
+    "isImmediatelyBannable": false
+  },
+  {
+    "shortName": "NO RUDE OR MEAN BEHAVIOR IN CHAT",
+    "description": "Don't be rude or mean to me and others in chat.",
+    "number": 9,
+    "isImmediatelyBannable": false
+  }
+]
