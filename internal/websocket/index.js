@@ -1,4 +1,7 @@
 const { Client, CommandInteraction } = require('discord.js');
+
+const { logger } = require('../../pkg/logger');
+const { name } = require('../../package.json');
 const { Service } = require('../service');
 
 /** WebSocket handles events from Discord */
@@ -41,6 +44,18 @@ class WebSocket {
 
       if (interaction.isUserContextMenu()) {}
     });
+  }
+
+  /**
+   * login connects to Discord's websocket.
+   * @param {string} token
+   */
+  async login(token) {
+    this.discordClient.on('ready', () => {
+      logger.success('Logged into Discord');
+      logger.success(`${name} ready!`);
+    });
+    await this.discordClient.login(token);
   }
 
   /**

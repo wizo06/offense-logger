@@ -1,0 +1,27 @@
+{
+    "env": {
+        "browser": true,
+        "commonjs": true,
+        "es2021": true
+    },
+    "extends": [
+        "google"
+    ],
+    "parserOptions": {
+        "ecmaVersion": "latest"
+    },
+    "plugins": [
+        "jsdoc"
+    ],
+    "rules": {
+        "object-curly-spacing": ["error", "always"],
+        "max-len": ["error", { "code": 180 }],
+
+        "jsdoc/check-types": 1,
+        "jsdoc/require-param-type": 1,
+        "jsdoc/require-property-type": 1,
+        "jsdoc/require-returns-type": 1,
+        "jsdoc/valid-types": 1,
+        "jsdoc/no-undefined-types": 1
+    }
+}

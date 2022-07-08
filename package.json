@@ -1,7 +1,9 @@
 {
+  "name": "offense-logger",
   "scripts": {
     "start": "node cmd/main.js",
-    "register": "node cmd/registerCommandInteraction.js"
+    "register": "node cmd/registerCommandInteraction.js",
+    "lint": "npx eslint . --fix"
   },
   "dependencies": {
     "@discordjs/builders": "^0.13.0",
@@ -11,6 +13,11 @@
     "@wizo06/logger": "^2.0.1",
     "discord-api-types": "^0.33.2",
     "discord.js": "^13.7.0",
-    "firebase-admin": "^10.2.0"
+    "mongodb": "^4.7.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.18.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-jsdoc": "^39.3.3"
   }
 }

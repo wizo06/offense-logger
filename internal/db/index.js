@@ -1,5 +1,6 @@
-const { logger } = require('../../pkg/logger');
 const { Db } = require('mongodb');
+
+const { logger } = require('../../pkg/logger');
 
 /** DB implements Standard Methods for interacting with MongoDB */
 class DB {
