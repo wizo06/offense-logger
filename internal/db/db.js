@@ -1,6 +1,6 @@
 const { Db } = require('mongodb');
 
-const { logger } = require('../../pkg/logger');
+const { logger } = require('../../pkg/logger/logger');
 
 /** DB implements Standard Methods for interacting with MongoDB */
 class DB {
@@ -34,7 +34,7 @@ class DB {
   async getDocument(collectionName, id) {
     try {
       const doc = await this.db.collection(collectionName).findOne({ _id: id });
-      if (!doc) return Promise.reject(new Error('DB_ERROR'));
+      if (!doc) return Promise.reject(new Error(`ID ${id} not found`));
 
       return Promise.resolve(doc);
     } catch (e) {
@@ -68,12 +68,12 @@ class DB {
   async updateDocument(collectionName, id, data) {
     try {
       const result = await this.db.collection(collectionName).updateOne({ _id: id }, { $set: data });
-      if (result.modifiedCount != 1) {
-        return Promise.reject(new Error('DB_ERROR'));
+      if (result.matchedCount != 1) {
+        return Promise.reject(new Error(`ID ${id} not found`));
       }
 
       const doc = await this.db.collection(collectionName).findOne({ _id: id });
-      if (!doc) return Promise.reject(new Error('DB_ERROR'));
+      if (!doc) return Promise.reject(new Error(`ID ${id} not found`));
 
       return Promise.resolve(doc);
     } catch (e) {
@@ -90,7 +90,7 @@ class DB {
     try {
       const result = await this.db.collection(collectionName).deleteOne({ _id: id });
       if (result.deletedCount != 1) {
-        return Promise.reject(new Error('DB_ERROR'));
+        return Promise.reject(new Error(`ID ${id} not found`));
       }
 
       return Promise.resolve();
@@ -108,12 +108,12 @@ class DB {
   async upsertDocument(collectionName, id, data) {
     try {
       const result = await this.db.collection(collectionName).updateOne({ _id: id }, { $set: data }, { upsert: true });
-      if (result.modifiedCount != 1) {
-        return Promise.reject(new Error('DB_ERROR'));
+      if (!(result.matchedCount == 1 || result.upsertedCount == 1)) {
+        return Promise.reject(new Error(`ID ${id} not found`));
       }
 
       const doc = await this.db.collection(collectionName).findOne({ _id: id });
-      if (!doc) return Promise.reject(new Error('DB_ERROR'));
+      if (!doc) return Promise.reject(new Error(`ID ${id} not found`));
 
       return Promise.resolve(doc);
     } catch (e) {
@@ -121,6 +121,20 @@ class DB {
       return Promise.reject(new Error('DB_ERROR'));
     }
   };
+
+  /**
+   * @param {string} collectionName
+   * @param {string} key
+   */
+  async distinct(collectionName, key) {
+    try {
+      const result = await this.db.collection(collectionName).distinct(key);
+      return result;
+    } catch (e) {
+      logger.error(e);
+      return Promise.reject(new Error('DB_ERROR'));
+    }
+  }
 }
 
 module.exports = { DB };

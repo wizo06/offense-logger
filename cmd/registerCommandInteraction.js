@@ -1,10 +1,10 @@
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 
-const { logger } = require('../pkg/logger');
+const { logger } = require('../pkg/logger/logger');
 const { discord } = require('../config/config.json');
 const discordRules = require('../config/discordRules.json');
-const enums = require('../internal/enums');
+const enums = require('../internal/enums/enums');
 const twitchRules = require('../config/twitchRules.json');
 
 const discordCommand = {
@@ -381,6 +381,8 @@ const twitchCommand = {
 };
 
 const rest = new REST({ version: '9' }).setToken(discord.token);
+
+/** */
 (async () => {
   try {
     logger.info('Started refreshing application (/) commands.');

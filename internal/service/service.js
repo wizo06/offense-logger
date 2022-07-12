@@ -1,9 +1,13 @@
 const { ApiClient } = require('@twurple/api');
+const { getTokenInfo } = require('@twurple/auth');
 const { CommandInteraction } = require('discord.js');
 
-const { DB } = require('../db');
+const config = require('../../config/config.json');
+const { randomUUID } = require('crypto');
+const { DB } = require('../db/db');
 const discordRules = require('../../config/discordRules.json');
-const { logger } = require('../../pkg/logger');
+const { logger } = require('../../pkg/logger/logger');
+const tokens = require('../../config/tokens.json');
 const twitchRules = require('../../config/twitchRules.json');
 
 /** Service handles all application logic and business logic */
@@ -127,24 +131,24 @@ class Service {
 
       const offenses = await this.dbClient.listDocuments(
           'discordOffenses',
-          offender ? { offenderId: offender.id } : null, // filter or no filter
-          { timestamp: -1 },
-          25,
+        offender ? { offenderId: offender.id } : null, // filter or no filter
+        { timestamp: -1 },
+        25,
       );
 
       const fields = offenses.map((offense) => {
         const rule = discordRules.filter((x) => x.number === offense.rule)[0];
         return {
-          name: `Offense ID: ${offense._id.toHexString()}`,
-          value: `Offender: <@${offense.offenderId}> | ${rule.number}. ${rule.shortName}\n
-          Reported by: <@${offense.reporterId}> | Time of report: <t:${offense.timestamp}>`,
+          name: `Offense ID: ${offense._id}`,
+          value: `Offender: <@${offense.offenderId}> | ${rule.number}. ${rule.shortName}
+          Reported by: <@${offense.reporterId}> | Time of report: ${convertTimestampNumberToDiscordTimestampFormat(offense.timestamp)}`,
         };
       });
 
       await interaction.editReply({
         embeds: [
           {
-            title: 'OFFENSES',
+            title: 'DISCORD OFFENSES',
             color: 0x5865f2,
             fields: fields,
           },
@@ -179,75 +183,21 @@ class Service {
 
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'OFFENSE',
-                description: offenseDoc.notes,
-                color: 0x5865f2,
-                author: {
-                  name: userTag,
-                  iconURL: userAvatarURL,
-                },
-                image: {
-                  url: offenseDoc.screenshotUrl,
-                },
-                footer: {
-                  text: `Offense ID: ${offenseDoc._id.toHexString()}`,
-                },
-                fields: [
-                  {
-                    name: 'Offender',
-                    value: `<@${offenseDoc.offenderId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreatedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Joined Server',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userJoinedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Channel',
-                    value: `<#${offenseDoc.channelId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Punishment',
-                    value: offenseDoc.punishment,
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Reported by',
-                    value: `<@${offenseDoc.reporterId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Time of report',
-                    value: convertTimestampNumberToDiscordTimestampFormat(offenseDoc.timestamp),
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: `${rule.number}. ${rule.shortName}`,
-                    value: rule.description,
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildDiscordOffenseEmbed({
+              description: offenseDoc.notes,
+              userTag: userTag,
+              userAvatarURL: userAvatarURL,
+              imageURL: offenseDoc.screenshotUrl,
+              footerText: `Offense ID: ${offenseDoc._id}`,
+              offenderId: offenseDoc.offenderId,
+              userCreatedTimestamp: userCreatedTimestamp,
+              userJoinedTimestamp: userJoinedTimestamp,
+              channelId: offenseDoc.channelId,
+              punishment: offenseDoc.punishment,
+              reporterId: offenseDoc.reporterId,
+              timestamp: offenseDoc.timestamp,
+              rule: rule,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -274,6 +224,7 @@ class Service {
       const reporter = interaction.options.getUser('reporter', false);
 
       const offenseDoc = await this.dbClient.createDocument('discordOffenses', {
+        _id: randomUUID(),
         timestamp: interaction.createdTimestamp,
         offenderId: offender.id,
         channelId: channel.id,
@@ -292,8 +243,7 @@ class Service {
         userJoinedTimestamp,
       } = await this.#getDiscordUserMetadata(interaction, offenseDoc.offenderId);
 
-      await this.dbClient.createDocument('discordUsers', {
-        _id: userId,
+      await this.dbClient.upsertDocument('discordUsers', userId, {
         userTag,
         userAvatarURL,
         userCreatedTimestamp,
@@ -304,75 +254,21 @@ class Service {
 
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'OFFENSE',
-                description: offenseDoc.notes,
-                color: 0x5865f2,
-                author: {
-                  name: userTag,
-                  iconURL: userAvatarURL,
-                },
-                image: {
-                  url: offenseDoc.screenshotUrl,
-                },
-                footer: {
-                  text: `Offense ID: ${offenseDoc._id.toHexString()}`,
-                },
-                fields: [
-                  {
-                    name: 'Offender',
-                    value: `<@${offenseDoc.offenderId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreatedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Joined Server',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userJoinedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Channel',
-                    value: `<#${offenseDoc.channelId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Punishment',
-                    value: offenseDoc.punishment,
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Reported by',
-                    value: `<@${offenseDoc.reporterId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Time of report',
-                    value: convertTimestampNumberToDiscordTimestampFormat(offenseDoc.timestamp),
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: `${rule.number}. ${rule.shortName}`,
-                    value: rule.description,
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildDiscordOffenseEmbed({
+              description: offenseDoc.notes,
+              userTag: userTag,
+              userAvatarURL: userAvatarURL,
+              imageURL: offenseDoc.screenshotUrl,
+              footerText: `Offense ID: ${offenseDoc._id}`,
+              offenderId: offenseDoc.offenderId,
+              userCreatedTimestamp: userCreatedTimestamp,
+              userJoinedTimestamp: userJoinedTimestamp,
+              channelId: offenseDoc.channelId,
+              punishment: offenseDoc.punishment,
+              reporterId: offenseDoc.reporterId,
+              timestamp: offenseDoc.timestamp,
+              rule: rule,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -399,15 +295,14 @@ class Service {
       const screenshot = interaction.options.getAttachment('screenshot');
       const reporter = interaction.options.getUser('reporter');
 
-      const updateMask = {
-        offenderId: offender ? offender.id : null,
-        punishment: punishment ? punishment : null,
-        channelId: channel ? channel.id : null,
-        rule: ruleNumber ? ruleNumber : null,
-        notes: notes ? notes : null,
-        screenshotUrl: screenshot ? screenshot.url : null,
-        reporterId: reporter ? reporter.id : null,
-      };
+      const updateMask = {};
+      if (offender) updateMask.offenderId = offender.id;
+      if (punishment) updateMask.punishment = punishment;
+      if (channel) updateMask.channelId = channel.id;
+      if (ruleNumber) updateMask.rule = ruleNumber;
+      if (notes) updateMask.notes = notes;
+      if (screenshot) updateMask.screenshotUrl = screenshot.url;
+      if (reporter) updateMask.reporterId = reporter.id;
 
       const offenseDoc = await this.dbClient.updateDocument('discordOffenses', id, updateMask);
 
@@ -431,75 +326,21 @@ class Service {
 
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'OFFENSE',
-                description: offenseDoc.notes,
-                color: 0x5865f2,
-                author: {
-                  name: userTag,
-                  iconURL: userAvatarURL,
-                },
-                image: {
-                  url: offenseDoc.screenshotUrl,
-                },
-                footer: {
-                  text: `Offense ID: ${offenseDoc._id.toHexString()}`,
-                },
-                fields: [
-                  {
-                    name: 'Offender',
-                    value: `<@${offenseDoc.offenderId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreatedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Joined Server',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userJoinedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Channel',
-                    value: `<#${offenseDoc.channelId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Punishment',
-                    value: offenseDoc.punishment,
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Reported by',
-                    value: `<@${offenseDoc.reporterId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Time of report',
-                    value: convertTimestampNumberToDiscordTimestampFormat(offenseDoc.timestamp),
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: `${rule.number}. ${rule.shortName}`,
-                    value: rule.description,
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildDiscordOffenseEmbed({
+              description: offenseDoc.notes,
+              userTag: userTag,
+              userAvatarURL: userAvatarURL,
+              imageURL: offenseDoc.screenshotUrl,
+              footerText: `Offense ID: ${offenseDoc._id}`,
+              offenderId: offenseDoc.offenderId,
+              userCreatedTimestamp: userCreatedTimestamp,
+              userJoinedTimestamp: userJoinedTimestamp,
+              channelId: offenseDoc.channelId,
+              punishment: offenseDoc.punishment,
+              reporterId: offenseDoc.reporterId,
+              timestamp: offenseDoc.timestamp,
+              rule: rule,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -537,7 +378,7 @@ class Service {
           .editReply({
             embeds: [
               {
-                title: 'RULES',
+                title: 'DISCORD RULES',
                 color: 0x5865f2,
                 fields: discordRules
                     .sort((a, b) => a.number - b.number)
@@ -558,22 +399,23 @@ class Service {
     try {
       await interaction.deferReply();
 
-      const users = await this.dbClient.listDocuments(
-          'discordUsers',
-          null,
-          { userTag: 1 },
-          70,
-      );
+      const usersId = await this.dbClient.distinct('discordOffenses', 'offenderId');
+
+      const users = [];
+      for (const userId of usersId) {
+        const { userCreatedTimestamp } = await this.#getDiscordUserMetadata(interaction, userId);
+        users.push({ userId, userCreatedTimestamp });
+      }
 
       await interaction
           .editReply({
             embeds: [
               {
-                title: 'USERS',
+                title: 'DISCORD USERS',
                 color: 0x5865f2,
                 description: users
                     .map((user) => {
-                      return `<@${user._id.toHexString()}> Account Created: ${convertTimestampNumberToDiscordTimestampFormat(
+                      return `<@${user.userId}> Account Created: ${convertTimestampNumberToDiscordTimestampFormat(
                           user.userCreatedTimestamp,
                       )}`;
                     })
@@ -605,41 +447,22 @@ class Service {
         userJoinedTimestamp,
       } = await this.#getDiscordUserMetadata(interaction, user.id);
 
+      await this.dbClient.upsertDocument('discordUsers', userId, {
+        userTag,
+        userAvatarURL,
+        userCreatedTimestamp,
+        userJoinedTimestamp,
+      });
+
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'USERS',
-                color: 0x5865f2,
-                author: {
-                  name: userTag,
-                  iconURL: userAvatarURL,
-                },
-                thumbnail: {
-                  url: userAvatarURL,
-                },
-                footer: {
-                  text: `User ID: ${userId}`,
-                },
-                fields: [
-                  {
-                    name: 'User',
-                    value: `<@${userId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreatedTimestamp),
-                    inline: true,
-                  },
-                  {
-                    name: 'Joined Server',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userJoinedTimestamp),
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildDiscordUserEmbed({
+              userTag: userTag,
+              userAvatarURL: userAvatarURL,
+              userId: userId,
+              userCreatedTimestamp: userCreatedTimestamp,
+              userJoinedTimestamp: userJoinedTimestamp,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -648,8 +471,19 @@ class Service {
   };
 
   /**
+   * @typedef getDiscordUserMetadataResponse
+   * @type {object}
+   * @property {string} userId
+   * @property {string} userTag
+   * @property {string|null} userAvatarURL
+   * @property {number} userCreatedTimestamp
+   * @property {number|null} userJoinedTimestamp
+   */
+
+  /**
    * @param {CommandInteraction} interaction
    * @param {string} userId
+   * @return {Promise<getDiscordUserMetadataResponse>}
    */
   async #getDiscordUserMetadata(interaction, userId) {
     try {
@@ -675,7 +509,7 @@ class Service {
         const user = await this.dbClient.getDocument('discordUsers', userId);
 
         return Promise.resolve({
-          userId: user._id.toHexString(),
+          userId: user._id.toString(),
           userTag: user.userTag,
           userAvatarURL: user.userAvatarUrl,
           userCreatedTimestamp: user.userCreatedTimestamp,
@@ -719,19 +553,22 @@ class Service {
           25,
       );
 
-      const fields = offenses.map((offense) => {
+      const fields = [];
+      for (const offense of offenses) {
         const rule = twitchRules.filter((x) => x.number === offense.rule)[0];
-        return {
-          name: `Offense ID: ${offense._id.toHexString()}`,
-          value: `Offender: <@${offense.offenderId}> | ${rule.number}. ${rule.shortName}\n
-          Reported by: <@${offense.reporterId}> | Time of report: <t:${offense.timestamp}>`,
-        };
-      });
+
+        const { userName } = await this.#getTwitchUserMetadata(offense.offenderId, '', false);
+        fields.push({
+          name: `Offense ID: ${offense._id}`,
+          value: `Offender: (${offense.offenderId})${userName} | ${rule.number}. ${rule.shortName}
+          Reported by: <@${offense.reporterId}> | Time of report: ${convertTimestampNumberToDiscordTimestampFormat(offense.timestamp)}`,
+        });
+      }
 
       await interaction.editReply({
         embeds: [
           {
-            title: 'OFFENSES',
+            title: 'TWITCH OFFENSES',
             color: 0x9146ff,
             fields: fields,
           },
@@ -756,13 +593,13 @@ class Service {
       const offenseDoc = await this.dbClient.getDocument('twitchOffenses', id);
 
       const {
+        userId,
         userName,
         userCreationDate,
         userProfilePictureUrl,
         userFollowsBroadcaster,
         userFollowBroadcasterDate,
         userSubscriptionTier,
-        userSubscriptionIsGift,
         userSubscriptionGifterName,
       } = await this.#getTwitchUserMetadata(offenseDoc.offenderId, '', false);
 
@@ -770,90 +607,23 @@ class Service {
 
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'OFFENSE',
-                description: offenseDoc.notes,
-                color: 0x9146ff,
-                author: {
-                  name: userName,
-                  iconURL: userProfilePictureUrl,
-                },
-                image: {
-                  url: offenseDoc.screenshotUrl,
-                },
-                footer: {
-                  text: `Offense ID: ${offenseDoc._id.toHexString()}`,
-                },
-                fields: [
-                  {
-                    name: 'Offender',
-                    value: userName,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreationDate.getTime()),
-                    inline: true,
-                  },
-                  {
-                    name: 'Follow Date (empty means "not following")',
-                    value: (userFollowsBroadcaster) ? convertTimestampNumberToDiscordTimestampFormat(userFollowBroadcasterDate.getTime()) : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Tier (empty means "not subscribed")',
-                    value: (userSubscriptionTier) ? userSubscriptionTier : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Gifted by (empty means "not gifted")',
-                    value: (userSubscriptionIsGift) ? userSubscriptionGifterName : '',
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Punishment',
-                    value: offenseDoc.punishment,
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Reported by',
-                    value: `<@${offenseDoc.reporterId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Time of report',
-                    value: convertTimestampNumberToDiscordTimestampFormat(offenseDoc.timestamp),
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: `${rule.number}. ${rule.shortName}`,
-                    value: rule.description,
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildTwitchOffenseEmbed({
+              description: offenseDoc.notes,
+              userId: userId,
+              userName: userName,
+              authorIconURL: userProfilePictureUrl,
+              imageURL: offenseDoc.screenshotUrl,
+              footerText: `Offense ID: ${offenseDoc._id}`,
+              userCreationDate: userCreationDate,
+              userFollowsBroadcaster: userFollowsBroadcaster,
+              userFollowBroadcasterDate: userFollowBroadcasterDate,
+              userSubscriptionTier: userSubscriptionTier,
+              userSubscriptionGifterName: userSubscriptionGifterName,
+              punishment: offenseDoc.punishment,
+              reporterId: offenseDoc.reporterId,
+              timestamp: offenseDoc.timestamp,
+              rule: rule,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -898,6 +668,7 @@ class Service {
       }
 
       const offenseDoc = await this.dbClient.createDocument('twitchOffenses', {
+        _id: randomUUID(),
         timestamp: interaction.createdTimestamp,
         offenderId: userId,
         punishment: punishment,
@@ -907,8 +678,7 @@ class Service {
         screenshotUrl: screenshot ? screenshot.url : null,
       });
 
-      await this.dbClient.createDocument('twitchUsers', {
-        _id: userId,
+      await this.dbClient.upsertDocument('twitchUsers', userId, {
         userName,
         userDisplayName,
         userCreationDate,
@@ -925,90 +695,23 @@ class Service {
 
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'OFFENSE',
-                description: offenseDoc.notes,
-                color: 0x9146ff,
-                author: {
-                  name: userName,
-                  iconURL: userProfilePictureUrl,
-                },
-                image: {
-                  url: offenseDoc.screenshotUrl,
-                },
-                footer: {
-                  text: `Offense ID: ${offenseDoc._id.toHexString()}`,
-                },
-                fields: [
-                  {
-                    name: 'Offender',
-                    value: userName,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreationDate.getTime()),
-                    inline: true,
-                  },
-                  {
-                    name: 'Follow Date (empty means "not following")',
-                    value: (userFollowsBroadcaster) ? convertTimestampNumberToDiscordTimestampFormat(userFollowBroadcasterDate.getTime()) : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Tier (empty means "not subscribed")',
-                    value: (userSubscriptionTier) ? userSubscriptionTier : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Gifted by (empty means "not gifted")',
-                    value: (userSubscriptionIsGift) ? userSubscriptionGifterName : '',
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Punishment',
-                    value: offenseDoc.punishment,
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Reported by',
-                    value: `<@${offenseDoc.reporterId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Time of report',
-                    value: convertTimestampNumberToDiscordTimestampFormat(offenseDoc.timestamp),
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: `${rule.number}. ${rule.shortName}`,
-                    value: rule.description,
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildTwitchOffenseEmbed({
+              description: offenseDoc.notes,
+              userId: userId,
+              userName: userName,
+              authorIconURL: userProfilePictureUrl,
+              imageURL: offenseDoc.screenshotUrl,
+              footerText: `Offense ID: ${offenseDoc._id}`,
+              userCreationDate: userCreationDate,
+              userFollowsBroadcaster: userFollowsBroadcaster,
+              userFollowBroadcasterDate: userFollowBroadcasterDate,
+              userSubscriptionTier: userSubscriptionTier,
+              userSubscriptionGifterName: userSubscriptionGifterName,
+              punishment: offenseDoc.punishment,
+              reporterId: offenseDoc.reporterId,
+              timestamp: offenseDoc.timestamp,
+              rule: rule,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -1040,14 +743,13 @@ class Service {
         return;
       }
 
-      const updateMask = {
-        offenderId: offender ? userId : null,
-        punishment: punishment ? punishment : null,
-        rule: ruleNumber ? ruleNumber : null,
-        notes: notes ? notes : null,
-        screenshotUrl: screenshot ? screenshot.url : null,
-        reporterId: reporter ? reporter.id : null,
-      };
+      const updateMask = {};
+      if (offender) updateMask.offenderId = userId;
+      if (punishment) updateMask.punishment = punishment;
+      if (ruleNumber) updateMask.rule = ruleNumber;
+      if (notes) updateMask.notes = notes;
+      if (screenshot) updateMask.screenshotUrl = screenshot.url;
+      if (reporter) updateMask.reporterId = reporter.id;
 
       const offenseDoc = await this.dbClient.updateDocument('twitchOffenses', id, updateMask);
 
@@ -1082,90 +784,23 @@ class Service {
 
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'OFFENSE',
-                description: offenseDoc.notes,
-                color: 0x9146ff,
-                author: {
-                  name: userName,
-                  iconURL: userProfilePictureUrl,
-                },
-                image: {
-                  url: offenseDoc.screenshotUrl,
-                },
-                footer: {
-                  text: `Offense ID: ${offenseDoc._id.toHexString()}`,
-                },
-                fields: [
-                  {
-                    name: 'Offender',
-                    value: userName,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreationDate.getTime()),
-                    inline: true,
-                  },
-                  {
-                    name: 'Follow Date (empty means "not following")',
-                    value: (userFollowsBroadcaster) ? convertTimestampNumberToDiscordTimestampFormat(userFollowBroadcasterDate.getTime()) : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Tier (empty means "not subscribed")',
-                    value: (userSubscriptionTier) ? userSubscriptionTier : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Gifted by (empty means "not gifted")',
-                    value: (userSubscriptionIsGift) ? userSubscriptionGifterName : '',
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Punishment',
-                    value: offenseDoc.punishment,
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: 'Reported by',
-                    value: `<@${offenseDoc.reporterId}>`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Time of report',
-                    value: convertTimestampNumberToDiscordTimestampFormat(offenseDoc.timestamp),
-                    inline: true,
-                  },
-                  {
-                    name: '\u200b',
-                    value: '\u200b',
-                    inline: true,
-                  },
-                  {
-                    name: `${rule.number}. ${rule.shortName}`,
-                    value: rule.description,
-                    inline: true,
-                  },
-                ],
-              },
-            ],
+            embeds: buildTwitchOffenseEmbed({
+              description: offenseDoc.notes,
+              userId: userId,
+              userName: userName,
+              authorIconURL: userProfilePictureUrl,
+              imageURL: offenseDoc.screenshotUrl,
+              footerText: `Offense ID: ${offenseDoc._id}`,
+              userCreationDate: userCreationDate,
+              userFollowsBroadcaster: userFollowsBroadcaster,
+              userFollowBroadcasterDate: userFollowBroadcasterDate,
+              userSubscriptionTier: userSubscriptionTier,
+              userSubscriptionGifterName: userSubscriptionGifterName,
+              punishment: offenseDoc.punishment,
+              reporterId: offenseDoc.reporterId,
+              timestamp: offenseDoc.timestamp,
+              rule: rule,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -1203,7 +838,7 @@ class Service {
           .editReply({
             embeds: [
               {
-                title: 'RULES',
+                title: 'TWITCH RULES',
                 color: 0x9146ff,
                 fields: twitchRules
                     .sort((a, b) => a.number - b.number)
@@ -1224,18 +859,19 @@ class Service {
     try {
       await interaction.deferReply();
 
-      const users = await this.dbClient.listDocuments(
-          'twitchUsers',
-          null,
-          { userName: 1 },
-          70,
-      );
+      const usersId = await this.dbClient.distinct('twitchOffenses', 'offenderId');
+
+      const users = [];
+      for (const userId of usersId) {
+        const { userName, userCreationDate } = await this.#getTwitchUserMetadata(userId, '', false);
+        users.push({ userName, userCreationDate });
+      }
 
       await interaction
           .editReply({
             embeds: [
               {
-                title: 'USERS',
+                title: 'TWITCH USERS',
                 color: 0x9146ff,
                 description: users
                     .map((user) => {
@@ -1266,12 +902,14 @@ class Service {
       const {
         userId,
         userName,
+        userDisplayName,
         userCreationDate,
         userProfilePictureUrl,
         userFollowsBroadcaster,
         userFollowBroadcasterDate,
         userSubscriptionTier,
         userSubscriptionIsGift,
+        userSubscriptionGifterId,
         userSubscriptionGifterName,
         err,
       } = await this.#getTwitchUserMetadata('', user, true);
@@ -1280,52 +918,31 @@ class Service {
         return;
       }
 
+      await this.dbClient.upsertDocument('twitchUsers', userId, {
+        userName,
+        userDisplayName,
+        userCreationDate,
+        userProfilePictureUrl,
+        userFollowsBroadcaster,
+        userFollowBroadcasterDate,
+        userSubscriptionTier,
+        userSubscriptionIsGift,
+        userSubscriptionGifterId,
+        userSubscriptionGifterName,
+      });
+
       await interaction
           .editReply({
-            embeds: [
-              {
-                title: 'USERS',
-                color: 0x9146ff,
-                author: {
-                  name: userName,
-                  iconURL: userProfilePictureUrl,
-                },
-                thumbnail: {
-                  url: userProfilePictureUrl,
-                },
-                footer: {
-                  text: `User ID: ${userId}`,
-                },
-                fields: [
-                  {
-                    name: 'User',
-                    value: userName,
-                    inline: true,
-                  },
-                  {
-                    name: 'Account Created',
-                    value: convertTimestampNumberToDiscordTimestampFormat(userCreationDate.getTime()),
-                    inline: true,
-                  },
-                  {
-                    name: 'Follow Date (empty means "not following")',
-                    value: (userFollowsBroadcaster) ? convertTimestampNumberToDiscordTimestampFormat(userFollowBroadcasterDate.getTime()) : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Tier (empty means "not subscribed")',
-                    value: (userSubscriptionTier) ? userSubscriptionTier : '',
-                    inline: true,
-                  },
-                  {
-                    name: 'Subscription Gifted by (empty means "not gifted")',
-                    value: (userSubscriptionIsGift) ? userSubscriptionGifterName : '',
-                    inline: true,
-                  },
-
-                ],
-              },
-            ],
+            embeds: buildTwitchUserEmbed({
+              userName,
+              userProfilePictureUrl,
+              userId,
+              userCreationDate,
+              userFollowsBroadcaster,
+              userFollowBroadcasterDate,
+              userSubscriptionTier,
+              userSubscriptionGifterName,
+            }),
           });
     } catch (e) {
       logger.error(e);
@@ -1340,27 +957,29 @@ class Service {
    */
   async #getTwitchUserMetadata(userId, username, throwIfUserNotFound) {
     try {
+      const tokenInfo = await getTokenInfo(tokens.accessToken, config.twitch.clientId);
+
       // Get offender metadata from twitch
       const user = (userId) ?
       await this.twitchClient.users.getUserById(userId) :
       await this.twitchClient.users.getUserByName(username);
+      if (!user) throw new Error('getUserByName() error');
 
       const broadcaster = await this.twitchClient.users.getUserByName('umikoyui');
-      if (!user) throw new Error('getUserByName() error');
       if (!broadcaster) throw new Error(user.id);
 
-      const subscription = await this.twitchClient.subscriptions.getSubscriptionForUser(broadcaster.id, user.id)
+      const subscription = (tokenInfo.scopes.includes('channel:read:subscriptions')) && (tokenInfo.userName == broadcaster.name) ?
+      await this.twitchClient.subscriptions.getSubscriptionForUser(broadcaster.id, user.id)
           .catch(() => {
             throw new Error(user.id);
-          });
+          }) :
+      null;
 
       const followsBroadcaster = await user.follows(broadcaster.id);
-
       const follow = await user.getFollowTo(broadcaster.id)
           .catch(() => {
             throw new Error(user.id);
           });
-      if (!follow) throw new Error(user.id);
 
       return Promise.resolve({
         userId: user.id,
@@ -1369,7 +988,7 @@ class Service {
         userCreationDate: user.creationDate,
         userProfilePictureUrl: user.profilePictureUrl,
         userFollowsBroadcaster: followsBroadcaster,
-        userFollowBroadcasterDate: follow.followDate,
+        userFollowBroadcasterDate: follow?.followDate,
         userSubscriptionTier: subscription?.tier,
         userSubscriptionIsGift: subscription?.isGift,
         userSubscriptionGifterId: subscription?.gifterId,
@@ -1378,6 +997,7 @@ class Service {
       });
     } catch (userId) {
       if (throwIfUserNotFound && Object.prototype.toString.call(userId) === '[object Error]') {
+        logger.error(userId);
         return Promise.resolve({
           userId: null,
           userName: null,
@@ -1396,10 +1016,10 @@ class Service {
 
       // Get offender metadata from db if failed to get from twitch
       try {
-        const user = await this.dbClient.getDocument('twitchUsers', userId);
+        const user = await this.dbClient.getDocument('twitchUsers', userId.message);
 
         return Promise.resolve({
-          userId: user._id.toHexString(),
+          userId: user._id.toString(),
           userName: user.userName,
           userDisplayName: user.userDisplayName,
           userCreationDate: user.userCreationDate,
@@ -1439,7 +1059,7 @@ module.exports = { Service };
  * @param {number} x - UNIX timestamp in either seconds or milliseconds.
  * @return {string}
  */
-const convertTimestampNumberToDiscordTimestampFormat = (x) =>{
+const convertTimestampNumberToDiscordTimestampFormat = (x) => {
   const y = `${x}`;
 
   // If timestamp has more than 10 digits,
@@ -1452,4 +1072,302 @@ const convertTimestampNumberToDiscordTimestampFormat = (x) =>{
   }
 
   return `<t:${x}:d><t:${x}:t>`;
+};
+
+/**
+ * @return {Array}
+ */
+const buildDiscordOffenseEmbed = ({
+  description,
+  userTag,
+  userAvatarURL,
+  imageURL,
+  footerText,
+  offenderId,
+  userCreatedTimestamp,
+  userJoinedTimestamp,
+  channelId,
+  punishment,
+  reporterId,
+  timestamp,
+  rule,
+}) => {
+  return [
+    {
+      title: 'DISCORD OFFENSE',
+      description: description,
+      color: 0x5865f2,
+      author: {
+        name: userTag,
+        iconURL: userAvatarURL,
+      },
+      image: {
+        url: imageURL,
+      },
+      footer: {
+        text: footerText,
+      },
+      fields: [
+        {
+          name: 'Offender',
+          value: `<@${offenderId}>`,
+          inline: true,
+        },
+        {
+          name: 'Account Created',
+          value: convertTimestampNumberToDiscordTimestampFormat(userCreatedTimestamp),
+          inline: true,
+        },
+        {
+          name: 'Joined Server',
+          value: convertTimestampNumberToDiscordTimestampFormat(userJoinedTimestamp),
+          inline: true,
+        },
+        {
+          name: 'Channel',
+          value: `<#${channelId}>`,
+          inline: true,
+        },
+        {
+          name: 'Punishment',
+          value: punishment,
+          inline: true,
+        },
+        {
+          name: '\u200b',
+          value: '\u200b',
+          inline: true,
+        },
+        {
+          name: 'Reported by',
+          value: `<@${reporterId}>`,
+          inline: true,
+        },
+        {
+          name: 'Time of report',
+          value: convertTimestampNumberToDiscordTimestampFormat(timestamp),
+          inline: true,
+        },
+        {
+          name: '\u200b',
+          value: '\u200b',
+          inline: true,
+        },
+        {
+          name: `${rule.number}. ${rule.shortName}`,
+          value: rule.description,
+          inline: true,
+        },
+      ],
+    },
+  ];
+};
+
+/**
+ * @return {Array}
+ */
+const buildDiscordUserEmbed = ({
+  userTag,
+  userAvatarURL,
+  userId,
+  userCreatedTimestamp,
+  userJoinedTimestamp,
+}) => {
+  return [
+    {
+      title: 'DISCORD USER',
+      color: 0x5865f2,
+      author: {
+        name: userTag,
+        iconURL: userAvatarURL,
+      },
+      thumbnail: {
+        url: userAvatarURL,
+      },
+      footer: {
+        text: `User ID: ${userId}`,
+      },
+      fields: [
+        {
+          name: 'User',
+          value: `<@${userId}>`,
+          inline: true,
+        },
+        {
+          name: 'Account Created',
+          value: convertTimestampNumberToDiscordTimestampFormat(userCreatedTimestamp),
+          inline: true,
+        },
+        {
+          name: 'Joined Server',
+          value: convertTimestampNumberToDiscordTimestampFormat(userJoinedTimestamp),
+          inline: true,
+        },
+      ],
+    },
+  ];
+};
+
+/**
+ * @return {Array}
+ */
+const buildTwitchOffenseEmbed = ({
+  description,
+  userId,
+  userName,
+  authorIconURL,
+  imageURL,
+  footerText,
+  userCreationDate,
+  userFollowsBroadcaster,
+  userFollowBroadcasterDate,
+  userSubscriptionTier,
+  userSubscriptionGifterName,
+  punishment,
+  reporterId,
+  timestamp,
+  rule,
+}) => {
+  return [
+    {
+      title: 'TWITCH OFFENSE',
+      description: description,
+      color: 0x9146ff,
+      author: {
+        name: userName,
+        iconURL: authorIconURL,
+      },
+      image: {
+        url: imageURL,
+      },
+      footer: {
+        text: footerText,
+      },
+      fields: [
+        {
+          name: 'Offender',
+          value: `(${userId})${userName}`,
+          inline: true,
+        },
+        {
+          name: 'Account Created',
+          value: convertTimestampNumberToDiscordTimestampFormat(userCreationDate.getTime()),
+          inline: true,
+        },
+        {
+          name: 'Follow Date',
+          value: (userFollowsBroadcaster) ? convertTimestampNumberToDiscordTimestampFormat(userFollowBroadcasterDate.getTime()) : 'N/A',
+          inline: true,
+        },
+        {
+          name: 'Subscription Tier',
+          value: (userSubscriptionTier) ? userSubscriptionTier : 'N/A',
+          inline: true,
+        },
+        {
+          name: 'Subscription Gifted by',
+          value: (userSubscriptionGifterName) ? userSubscriptionGifterName : 'N/A',
+          inline: true,
+        },
+        {
+          name: '\u200b',
+          value: '\u200b',
+          inline: true,
+        },
+        {
+          name: 'Punishment',
+          value: punishment,
+          inline: true,
+        },
+        {
+          name: '\u200b',
+          value: '\u200b',
+          inline: true,
+        },
+        {
+          name: '\u200b',
+          value: '\u200b',
+          inline: true,
+        },
+        {
+          name: 'Reported by',
+          value: `<@${reporterId}>`,
+          inline: true,
+        },
+        {
+          name: 'Time of report',
+          value: convertTimestampNumberToDiscordTimestampFormat(timestamp),
+          inline: true,
+        },
+        {
+          name: '\u200b',
+          value: '\u200b',
+          inline: true,
+        },
+        {
+          name: `${rule.number}. ${rule.shortName}`,
+          value: rule.description,
+          inline: true,
+        },
+      ],
+    },
+  ];
+};
+
+/**
+ * @return {Array}
+ */
+const buildTwitchUserEmbed = ({
+  userName,
+  userProfilePictureUrl,
+  userId,
+  userCreationDate,
+  userFollowsBroadcaster,
+  userFollowBroadcasterDate,
+  userSubscriptionTier,
+  userSubscriptionGifterName,
+}) => {
+  return [
+    {
+      title: 'TWITCH USER',
+      color: 0x9146ff,
+      author: {
+        name: userName,
+        iconURL: userProfilePictureUrl,
+      },
+      thumbnail: {
+        url: userProfilePictureUrl,
+      },
+      footer: {
+        text: `User ID: ${userId}`,
+      },
+      fields: [
+        {
+          name: 'User',
+          value: userName,
+          inline: true,
+        },
+        {
+          name: 'Account Created',
+          value: convertTimestampNumberToDiscordTimestampFormat(userCreationDate.getTime()),
+          inline: true,
+        },
+        {
+          name: 'Follow Date',
+          value: (userFollowsBroadcaster) ? convertTimestampNumberToDiscordTimestampFormat(userFollowBroadcasterDate.getTime()) : 'N/A',
+          inline: true,
+        },
+        {
+          name: 'Subscription Tier',
+          value: (userSubscriptionTier) ? userSubscriptionTier : 'N/A',
+          inline: true,
+        },
+        {
+          name: 'Subscription Gifted by',
+          value: (userSubscriptionGifterName) ? userSubscriptionGifterName : 'N/A',
+          inline: true,
+        },
+      ],
+    },
+  ];
 };

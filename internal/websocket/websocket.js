@@ -1,8 +1,8 @@
 const { Client, CommandInteraction } = require('discord.js');
 
-const { logger } = require('../../pkg/logger');
+const { logger } = require('../../pkg/logger/logger');
 const { name } = require('../../package.json');
-const { Service } = require('../service');
+const { Service } = require('../service/service');
 
 /** WebSocket handles events from Discord */
 class WebSocket {
@@ -62,6 +62,8 @@ class WebSocket {
    * @param {CommandInteraction} interaction
    */
   #handleCommandInteraction(interaction) {
+    logger.info(`${interaction.user.id} ${interaction.user.tag} ${interaction.commandName} ${interaction.options.getSubcommandGroup()} ${interaction.options.getSubcommand()}`);
+
     if (interaction.commandName === 'discord') {
       this.serviceClient.handleDiscordCommandInteraction(interaction);
       return;
@@ -75,3 +77,4 @@ class WebSocket {
 }
 
 module.exports = { WebSocket };
+

@@ -10,7 +10,7 @@
     "@discordjs/rest": "^0.4.1",
     "@twurple/api": "^5.1.6",
     "@twurple/auth": "^5.1.6",
-    "@wizo06/logger": "^2.0.1",
+    "@wizo06/logger": "^2.1.1",
     "discord-api-types": "^0.33.2",
     "discord.js": "^13.7.0",
     "mongodb": "^4.7.0"
